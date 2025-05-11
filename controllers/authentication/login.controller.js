@@ -50,7 +50,7 @@ module.exports.login = async (req, res) => {
       statusCode: 200,
       message: "Đăng nhập thành công",
       accessToken: accessToken,
-      tokenExpiresIn: accessTokenExpiresIn, // giây
+      accessTokenExpiresIn: accessTokenExpiresIn, // giây
       refreshToken: refreshToken,
       refreshTokenExpiresIn: refreshTokenExpiresIn, // giây
     });
