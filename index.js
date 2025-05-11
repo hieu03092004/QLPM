@@ -5,6 +5,7 @@ const route = require("./routes/student/index.routes.js");
 const routeAuthentication=require("./routes/home/index.routes.js");
 const routeEquipmentManager=require("./routes/equipment_manager/index.routes.js")
 const routeLecturer=require("./routes/lecturer/index.routes.js")
+const routeAdmin=require("./routes/admin/index.routes.js")
 const app = express();
 app.use(express.json());
 
@@ -18,6 +19,7 @@ route(app);
 routeAuthentication(app);
 routeEquipmentManager(app);
 routeLecturer(app);
+routeAdmin(app);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);

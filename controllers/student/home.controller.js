@@ -34,11 +34,11 @@ exports.lichThucHanh = async (req, res) => {
         
         // Định dạng lại kết quả theo yêu cầu
         const formattedData = data.map(item => ({
-            title: item.ten_hoc_phan,
-            lecturer: item.ten_giang_vien,
-            room: `Phòng ${item.phong_thuc_hanh}`,
-            "Thoi Gian": item.thoi_gian,
-            "So Luong": item.so_luong_sinh_vien
+            ten_hoc_phan: item.ten_hoc_phan,
+            ten_giang_vien: item.ten_giang_vien,
+            Phong: `Phòng ${item.phong_thuc_hanh}`,
+            thoi_gian: item.thoi_gian,
+            so_luong: item.so_luong_sinh_vien
         }));
         
         return res.status(200).json({
@@ -66,6 +66,13 @@ const result={
             "lecturer": "Nguyen Van A",
             "room": "Phong G8.101",
             "Thoi Gian": "08:00-10:00",
+            "So Luong":12
+        },
+        {
+            "title": "Thuc Hanh Co So Du LIeuA",
+            "lecturer": "Nguyen Van A",
+            "room": "Phong G8.101",
+            "Thoi Gian": "14:00-15:00",
             "So Luong":12
         },
     ]

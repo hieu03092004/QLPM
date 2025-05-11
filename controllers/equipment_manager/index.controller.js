@@ -210,9 +210,9 @@ module.exports.rooms = async(req, res) => {
     
     // 3. Map counts to rooms
     const result = rooms.map(r => ({
-      code: r.ma_phong_may,
-      building: r.ma_toa_nha,
-      computerCount: roomCounts[r.ma_phong_may] || 0
+      ma_phong: r.ma_phong_may,
+      ma_toa_nha: r.ma_toa_nha,
+      so_luong_may_tinh: roomCounts[r.ma_phong_may] || 0
     }));
     
     res.json(result);
