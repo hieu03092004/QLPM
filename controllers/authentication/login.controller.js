@@ -16,31 +16,56 @@ module.exports.login = async (req, res) => {
   }
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // Đăng nhập với Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) {
+    if (authError) {
       return res.status(401).json({
         success: false,
         statusCode: 401,
-        message: "Đăng nhập thất bại: " + error.message,
+        message: "Đăng nhập thất bại: " + authError.message,
       });
     }
+
+    // Lấy thông tin chi tiết user từ bảng TaiKhoan
+    const { data: userData, error: userError } = await supabase
+      .from("TaiKhoan")
+      .select("ma_so_tai_khoan, email, ho_va_ten, ma_vai_tro, trang_thai")
+      .eq("email", email)
+      .single();
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        success: false,
+        statusCode: 404,
+        message: "Không tìm thấy thông tin người dùng",
+      });
+    }
+
+    // Format user data
+    const user = {
+      id: userData.ma_so_tai_khoan,
+      email: userData.email,
+      fullName: userData.ho_va_ten,
+      roleId: userData.ma_vai_tro,
+      status: userData.trang_thai,
+    };
 
     // Set expiration durations
     const accessTokenExpiresIn = 60 * 60; // 1 hour in seconds
     const refreshTokenExpiresIn = 60 * 60 * 24 * 7; // 7 days in seconds
 
     const accessToken = jwt.sign(
-      { userId: data.user.id, email: data.user.email },
+      { userId: user.id, email: user.email },
       SECRET_KEY,
       { expiresIn: accessTokenExpiresIn }
     );
 
     const refreshToken = jwt.sign(
-      { userId: data.user.id },
+      { userId: user.id },
       REFRESH_SECRET_KEY,
       { expiresIn: refreshTokenExpiresIn }
     );
@@ -50,9 +75,10 @@ module.exports.login = async (req, res) => {
       statusCode: 200,
       message: "Đăng nhập thành công",
       accessToken: accessToken,
-      accessTokenExpiresIn: accessTokenExpiresIn, // giây
+      accessTokenExpiresIn: accessTokenExpiresIn,
       refreshToken: refreshToken,
-      refreshTokenExpiresIn: refreshTokenExpiresIn, // giây
+      refreshTokenExpiresIn: refreshTokenExpiresIn,
+      data: user,
     });
   } catch (err) {
     return res.status(500).json({
