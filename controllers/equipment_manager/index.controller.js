@@ -80,7 +80,12 @@ module.exports.devices = async (req, res) => {
           const { LoaiThietBi, ...rest } = item;
           return rest;
         });
-        res.json({ success: true, data: cleanedData });
+        res.json(
+          { 
+            statusCode: 200, 
+            success: true, 
+            data: cleanedData }
+          );
     } catch (err) {
         console.error('Lỗi không mong muốn:', err);
         res.status(500).json({ success: false, error: 'Lỗi server nội bộ' });
@@ -114,7 +119,13 @@ module.exports.edit = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Không tìm thấy thiết bị' });
     }
 
-    res.json({ success: true, updated: data[0] });
+    res.json(
+    {
+      statusCode: 200,
+      success: true, 
+      updated: data[0] 
+    }
+    );
   } catch (err) {
     console.error('Unexpected error:', err);
     res.status(500).json({ success: false, error: 'Lỗi server nội bộ' });
@@ -169,6 +180,7 @@ module.exports.createPost = async (req, res) => {
 
     // Thành công
     res.status(201).json({
+      statusCode: 200,
       success: true,
       created: data[0]
     });
@@ -225,7 +237,13 @@ module.exports.rooms = async(req, res) => {
       so_luong_may_tinh: roomCounts[r.ma_phong_may] || 0
     }));
     
-    res.json(result);
+    res.json(
+      {
+        statusCode: 200,
+        success: true,
+        data: result
+      }
+    );
   } catch (error) {
     console.error('Error in rooms endpoint:', error);
     res.status(500).json({ error: 'Internal server error' });
