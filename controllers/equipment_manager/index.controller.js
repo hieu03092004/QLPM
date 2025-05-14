@@ -120,22 +120,32 @@ module.exports.edit = async (req, res) => {
     res.status(500).json({ success: false, error: 'Lỗi server nội bộ' });
   }
 };
+function generateRandomId(length = 10) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 module.exports.createPost = async (req, res) => {
-  // Lấy dữ liệu từ body
+  // Lấy dữ liệu từ body (không lấy ma_thiet_bi)
   const {
-    ma_thiet_bi,
     ma_loai_thiet_bi,
     ma_phong_su_dung,
-    ngay_mua,     // chuỗi 'YYYY-MM-DD'
-    gia_tri       // số, ví dụ 15000000.00
+    ngay_mua, // chuỗi 'YYYY-MM-DD'
+    gia_tri   // số, ví dụ 15000000.00
   } = req.body;
-  console.log(req.body);
+
+  // Tự động sinh ma_thiet_bi 10 kí tự
+  const ma_thiet_bi = generateRandomId(10);
+
   // Kiểm tra dữ liệu bắt buộc
-  if (!ma_thiet_bi || !ma_loai_thiet_bi || !ma_phong_su_dung
-    || !ngay_mua || gia_tri == null) {
+  if (!ma_loai_thiet_bi || !ma_phong_su_dung || !ngay_mua || gia_tri == null) {
     return res.status(400).json({
       success: false,
-      error: 'Thiếu trường bắt buộc: ma_thiet_bi, ma_loai_thiet_bi, ma_phong_su_dung, trang_thai_thiet_bi, ngay_mua, gia_tri'
+      error: 'Thiếu trường bắt buộc: ma_loai_thiet_bi, ma_phong_su_dung, ngay_mua, gia_tri'
     });
   }
 
@@ -144,13 +154,13 @@ module.exports.createPost = async (req, res) => {
     const { data, error } = await supabase
       .from('ThietBi')
       .insert([{
-        ma_thiet_bi,
+        ma_thiet_bi,       // sử dụng ID tự sinh
         ma_loai_thiet_bi,
         ma_phong_su_dung,
         ngay_mua,
         gia_tri
       }])
-      .select();   // để trả về bản ghi vừa tạo
+      .select(); // để trả về bản ghi vừa tạo
 
     if (error) {
       console.error('Supabase insert error:', error);
@@ -210,9 +220,9 @@ module.exports.rooms = async(req, res) => {
     
     // 3. Map counts to rooms
     const result = rooms.map(r => ({
-      code: r.ma_phong_may,
-      building: r.ma_toa_nha,
-      computerCount: roomCounts[r.ma_phong_may] || 0
+      ma_phong: r.ma_phong_may,
+      ma_toa_nha: r.ma_toa_nha,
+      so_luong_may_tinh: roomCounts[r.ma_phong_may] || 0
     }));
     
     res.json(result);
