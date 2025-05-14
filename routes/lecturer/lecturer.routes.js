@@ -6,6 +6,7 @@ router.get('/khoa-hoc/:accountId',controllerLecturer.course);
 router.get('/dang-ky-lich-thuc-hanh/:course_class_id',controllerLecturer.registerSchedule );
 router.post('/dang-ky-lich-thuc-hanh',controllerLecturer.registerSchedulePost );
 module.exports=router;
+  
 // const request=
 //     {
 //         "ma_lop_hoc_phan": 'LHP_INS327_241_01',
