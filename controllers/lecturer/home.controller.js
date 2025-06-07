@@ -438,7 +438,7 @@ module.exports.registerSchedulePost = async (req, res) => {
     const { ma_lop_hoc_phan, ma_phong, lich } = req.body
 
     // 1. Tự generate mã nhóm thực hành
-    const ma_nhom_thuc_hanh = `NTH_${ma_lop_hoc_phan}_${Date.now()}`
+    const ma_nhom_thuc_hanh = `${ma_lop_hoc_phan}_N${Date.now()}`
 
     // 2. Insert vào bảng NhomThucHanh
     const { error: errNhom } = await supabase
