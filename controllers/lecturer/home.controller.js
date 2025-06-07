@@ -315,7 +315,7 @@ const result = {
 };
 
 // Lấy mảng tuần chỉ gồm số_thu_tu (ví dụ: [2, 4, 6, 8, 10])
-const tuanDisplay = maTuanList.map(tuan => tuan.so_thu_tu);
+const tuanDisplay = maTuanList.map(tuan => tuan.ma_tuan);
 
 // Build map ca_thu => thông tin ca, thứ, giờ bắt đầu/kết thúc
 const caThuMap = {};
