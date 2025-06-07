@@ -1,0 +1,465 @@
+-- 1. Bảng ToaNha
+INSERT INTO "ToaNha" ("ma_toa_nha", "dia_chi_toa_nha") VALUES
+  ('G8', 'G8 02 Nguyển Đình Chiểu'),
+  ('G7', 'G8 02 Nguyển Đình Chiểu'),
+  ('G6', 'G6 02 Nguyễn Đình Chiểu');
+select *from "TaiKhoan" where ma_so_tai_khoan='ef56b24b-454d-4058-9ef6-cdd00dc8c7cd'
+UPDATE "TaiKhoan"
+SET ho_va_ten = 'TruongThanhHieu'
+WHERE ma_so_tai_khoan = 'ef56b24b-454d-4058-9ef6-cdd00dc8c7cd';
+
+
+SELECT oid, proname, proargtypes
+FROM pg_proc
+WHERE proname = 'get_lich_thuc_hanh_sinh_vien';
+SELECT pg_get_functiondef(17198);
+CREATE OR REPLACE FUNCTION public.get_lich_thuc_hanh_sinh_vien(p_sinh_vien_id uuid, p_ngay date)
+ RETURNS TABLE(ten_hoc_phan text, ten_giang_vien text, phong_thuc_hanh text, thoi_gian text, so_luong_sinh_vien integer)
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  RETURN QUERY
+  WITH thoi_gian_ca_hoc AS (
+    SELECT 
+      cht.ma_ca_thu,
+      CONCAT(ca.gio_bat_dau, '-', ca.gio_ket_thuc) AS thoi_gian_hoc
+    FROM "CaHoc_ThuTrongTuan" cht
+    JOIN "CaHoc" ca 
+      ON ca.ma_ca_hoc = cht.ma_ca
+  )
+  , sv_filter AS (
+    -- lấy từng nhóm + ca mà sinh viên này tham gia vào ngày p_ngay
+    SELECT 
+      nth.ma_nhom_thuc_hanh,
+      nth.phong_thuc_hanh,
+      hp.ten_hoc_phan,
+      tk.ho_va_ten        AS ten_giang_vien,
+      tgch.thoi_gian_hoc,
+      sv.ma_so_tai_khoan_sinh_vien
+    FROM "SinhVienNhomThucHanh" sv
+    JOIN "NhomThucHanh" nth 
+      ON sv.ma_nhom_thuc_hanh     = nth.ma_nhom_thuc_hanh
+    JOIN "PhieuDangKy" pdk 
+      ON pdk.ma_nhom_thuc_hanh    = nth.ma_nhom_thuc_hanh
+    JOIN "ChiTietDangKy" ctdk 
+      ON ctdk.ma_phieu            = pdk.ma_phieu
+     AND ctdk.ngay_hoc            = p_ngay
+    JOIN thoi_gian_ca_hoc tgch 
+      ON ctdk.ma_ca_thu           = tgch.ma_ca_thu
+    JOIN "LopHocPhan" lhp 
+      ON nth.ma_lop_hoc_phan      = lhp.ma_lop_hoc_phan
+    JOIN "HocPhan" hp 
+      ON lhp.ma_hoc_phan          = hp.ma_hoc_phan
+    JOIN "TaiKhoan" tk 
+      ON lhp.ma_tai_khoan_can_bo_giang_day = tk.ma_so_tai_khoan
+    WHERE sv.ma_so_tai_khoan_sinh_vien = p_sinh_vien_id
+  )
+  , group_counts AS (
+    -- đếm tổng số thành viên của mỗi nhóm trong sv_filter
+    SELECT 
+      ma_nhom_thuc_hanh,
+      COUNT(*)::INT AS total_members
+    FROM "SinhVienNhomThucHanh"
+    WHERE ma_nhom_thuc_hanh IN (
+      SELECT DISTINCT ma_nhom_thuc_hanh FROM sv_filter
+    )
+    GROUP BY ma_nhom_thuc_hanh
+  )
+  SELECT
+    sf.ten_hoc_phan       ::TEXT   AS ten_hoc_phan,
+    sf.ten_giang_vien     ::TEXT   AS ten_giang_vien,
+    sf.phong_thuc_hanh    ::TEXT   AS phong_thuc_hanh,
+    sf.thoi_gian_hoc      ::TEXT   AS thoi_gian,
+    gc.total_members             AS so_luong_sinh_vien
+  FROM sv_filter sf
+  JOIN group_counts gc
+    ON gc.ma_nhom_thuc_hanh = sf.ma_nhom_thuc_hanh;
+END;
+$function$
+
+select *from "LopHocPhan"
+select *from "TuanHoc" where ma_nam_hoc_hoc_ky=1
+select *from "TuanHoc"
+select *from "NamHoc_HocKy"
+select *from "LopHocPhan_SinhVien"
+select *from "SinhVienNhomThucHanh"
+select *from "PhieuDangKy"
+select *from "NhomThucHanh"
+select *from "PhieuDangKy"
+select *from "LopHocPhan"
+select *from "NhomThucHanh"
+select *from "ChiTietDangKy" where ma_phieu=41
+
+select *from "ChiTietDangKy" where ma_phieu=41
+-- 2. Bảng PhongMay
+INSERT INTO "PhongMay" ("ma_phong_may", "ma_toa_nha", "ma_tai_khoan_can_bo_quan_ly") VALUES
+  ('P001', 'G8', 1001),
+  ('P002', 'G7', 1002),
+  ('P003', 'G6', 1001);
+select *from "PhongMay"
+select *from "LoaiThietBi"
+select *from "TaiKhoan"
+select *from "CaHoc_ThuTrongTuan"
+select *from "TuanHoc"
+INSERT INTO LopHocPhan_SinhVien (ma_lop_hoc_phan, sinh_vien_id)
+select *from "NamHoc_HocKy"
+select *from "PhieuDangKy"
+ALTER TABLE "PhieuDangKy"
+ALTER COLUMN ma_nhom_thuc_hanh TYPE VARCHAR(50);
+
+VALUES 
+('CC23TTHNH20232024HK1', '1614dd03-00f7-42c9-be7c-9d07809e44b4'),
+('LHP_INS327_241_01', '1614dd03-00f7-42c9-be7c-9d07809e44b4');
+
+-- 3. Bảng LoaiThietBi
+INSERT INTO "LoaiThietBi" ("ma_loai_thiet_bi", "ten_loai_thiet_bi", "hang_san_xuat", "cau_hinh", "thong_so_ky_thuat") VALUES
+  ('LTB01', 'Máy tính để bàn', 'Dell', 'Intel i7, 16GB RAM, SSD 512GB', 'CPU: i7-10700; RAM: 16GB; SSD: 512GB; GPU: onboard'),
+  ('LTB02', 'Màn hình LCD', 'Samsung', '27-inch, 1080p', 'Kích thước: 27"; Độ phân giải: 1920x1080; Tấm nền: IPS'),
+  ('LTB03', 'Máy in laser', 'HP', 'Monochrome, 20ppm', 'Loại: laser đen trắng; Tốc độ: 20 trang/phút; Kết nối: USB, Ethernet');
+select *from "LopHocPhan"
+select *from "ThietBi"
+select *from "HocPhan"
+select *from "ChiTietDangKy" where ma_chi_tiet_dang_ky=136
+select *from "LopHocPhan"
+select *from "TuanHoc" where ma_nam_hoc
+_hoc_ky=1
+-- 4. Bảng ThietBi (lưu ý: ma_chi_tiet_hoa_don để NULL nếu chưa có hóa đơn)
+INSERT INTO "ThietBi" (
+  "ma_thiet_bi", "ma_loai_thiet_bi", "ma_phong_su_dung",
+   "trang_thai_thiet_bi", "ngay_mua", "gia_tri"
+) VALUES
+  ('PC003', 'PC', 'G8.101','dang_su_dung', '2023-01-15', 15000000.00),
+  ('PC004', 'PC', 'G8.101', 'dang_su_dung', '2022-12-05', 15000000.00),
+  ('MC003', 'MC', 'G8.101',  'dang_su_dung','2021-07-20', 3000000.00),
+  ('MC004', 'MC', 'G7P002',  'hong', '2024-03-10', 5000000.00);
+select *from "LopHocPhan"
+SELECT conname
+FROM pg_constraint
+WHERE conrelid = 'public."ThietBi"'::regclass;
+INSERT INTO "LopHocPhan" (ma_lop_hoc_phan, ma_tai_khoan_can_bo_giang_day, ma_hoc_phan, ma_nam_hoc_hoc_ky)
+VALUES
+  ('CC23TTHNH20232024HK1','e886c956-1028-401a-95a6-337e9a0c6b6e', 'CC23TTH', 1),
+  ('SOT344NH20232024HK1', 'e886c956-1028-401a-95a6-337e9a0c6b6e','SOT344', 1),
+  ('SOT392NH20232024HK1',  'e886c956-1028-401a-95a6-337e9a0c6b6e', 'SOT392', 1),
+  ('SOT386NH20232024HK1',  '3734a925-e8cd-43e1-8227-d5ce55c4d777', 'SOT386', 1);
+
+-- 1. Thêm cột ngay_hoc kiểu DATE vào ChiTietDangKy
+ALTER TABLE "ChiTietDangKy"
+ADD COLUMN ngay_hoc DATE;
+GO
+
+-- 2. Chèn dữ liệu mẫu vào PhieuDangKy
+-- Giả sử có 3 nhóm thực hành: 'TH01', 'TH02', 'TH03'
+select *from "PhieuDangKy"
+INSERT INTO "PhieuDangKy" (ma_nhom_thuc_hanh, ngay_dk)
+VALUES
+  ('TH0164CNTT3', '2025-05-01 09:15:00'),
+  ('TH0264CNTT3', '2025-05-02 14:30:00'),
+  ('TH0364CNTT3', '2025-05-03 10:00:00');
+GO
+
+-- 3. Chèn dữ liệu mẫu vào ChiTietDangKy (sau khi đã thêm cột ngay_hoc)
+-- Giả sử PhieuDangKy tự sinh ma_phieu = 1,2,3 tương ứng:
+INSERT INTO "ChiTietDangKy" (ma_phieu, ma_tuan, ma_ca_thu, ngay_hoc)
+VALUES
+  (38,  2, 2, '2025-05-11'),
+  (38,  3, 2, '2025-05-18');
+GO
+INSERT INTO "SinhVienNhomThucHanh" (ma_nhom_thuc_hanh, ma_so_tai_khoan_sinh_vien,thoi_diem_dang_ky)
+VALUES
+    ('TH0164CNTT3','b276acbf-b56a-4556-993c-74f43fd0b036','2025-11-05')
+select *from "SinhVienNhomThucHanh"
+select *from "NhomThucHanh"
+
+select *from "TuanHoc"
+SELECT conname, contype
+FROM pg_constraint
+WHERE conrelid = '"ThietBi"'::regclass;
+ALTER TABLE "ThietBi"
+DROP CONSTRAINT "FK_ThietBi_ChiTietHoaDon";
+DROP table "HoaDon"
+ALTER TABLE "ThietBi"
+DROP COLUMN ma_chi_tiet_hoa_don;
+ALTER TABLE "ThietBi"
+ADD CONSTRAINT FK_ThietBi_LoaiThietBi
+FOREIGN KEY (ma_loai_thiet_bi)
+REFERENCES "LoaiThietBi"(ma_loai_thiet_bi);
+select *from "ThietBi"
+ALTER TABLE "ThietBi"
+ALTER COLUMN "trang_thai_thiet_bi" SET DEFAULT 'dang_su_dung';
+select *from "ThietBi"
+select 
+-- Table: VaiTro
+CREATE TABLE VaiTro (
+    ma_vai_tro BIGINT PRIMARY KEY,
+    ten_vai_tro VARCHAR(50) NOT NULL UNIQUE
+);
+ALTER TABLE "ChiTietDangKy" ADD COLUMN ngay_hoc DATE;
+
+select *from "LopHocPhan"
+-- Table: TaiKhoan
+CREATE TABLE TaiKhoan (
+    ma_so_tai_khoan BIGINT PRIMARY KEY,
+    ma_vai_tro BIGINT NOT NULL REFERENCES VaiTro(ma_vai_tro),
+    mat_khau VARCHAR(255) NOT NULL,
+    ho_va_ten VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    trang_thai VARCHAR(20) NOT NULL
+);
+CREATE INDEX IX_TaiKhoan_Email ON TaiKhoan(email);
+CREATE INDEX IX_TaiKhoan_TrangThai ON TaiKhoan(trang_thai);
+INSERT INTO "NhomThucHanh" (
+    ma_nhom_thuc_hanh,
+    ma_lop_hoc_phan,
+    phong_thuc_hanh,
+    ma_ca_thu
+)
+VALUES 
+('TH0164CNTT3', 'CC23TTHNH20232024HK1', 'G8.101', 2),
+('TH0264CNTT3', 'CC23TTHNH20232024HK1', 'G8.101', 2),
+('TH0364CNTT3', 'CC23TTHNH20232024HK1', 'G8.101', 2);
+
+select *from "ChiTietDangKy"
+-- Table: TinhNang
+CREATE TABLE TinhNang (
+    ma_tinh_nang BIGINT PRIMARY KEY,
+    ten_tinh_nang VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- Table: VaiTro_TinhNang
+CREATE TABLE VaiTro_TinhNang (
+    ma_vai_tro BIGINT NOT NULL REFERENCES VaiTro(ma_vai_tro),
+    ma_tinh_nang BIGINT NOT NULL REFERENCES TinhNang(ma_tinh_nang),
+    PRIMARY KEY (ma_vai_tro, ma_tinh_nang)
+);
+
+-- Table: ToaNha
+CREATE TABLE ToaNha (
+    ma_toa_nha VARCHAR(5) PRIMARY KEY,
+    dia_chi_toa_nha VARCHAR(255) NOT NULL
+);
+
+-- Table: PhongMay
+CREATE TABLE PhongMay (
+    ma_phong_may VARCHAR(10) PRIMARY KEY,
+    ma_toa_nha VARCHAR(5) NOT NULL REFERENCES ToaNha(ma_toa_nha),
+    ma_tai_khoan_can_bo_quan_ly BIGINT NOT NULL REFERENCES TaiKhoan(ma_so_tai_khoan)
+);
+CREATE INDEX IX_PhongMay_MaToaNha ON PhongMay(ma_toa_nha);
+CREATE INDEX IX_PhongMay_MaTaiKhoanQuanLy ON PhongMay(ma_tai_khoan_can_bo_quan_ly);
+
+-- Table: LoaiThietBi
+CREATE TABLE LoaiThietBi (
+    ma_loai_thiet_bi VARCHAR(10) PRIMARY KEY,
+    ten_loai_thiet_bi VARCHAR(255) NOT NULL,
+    hang_san_xuat VARCHAR(100) NOT NULL,
+    cau_hinh VARCHAR(500) NOT NULL,
+    thong_so_ky_thuat TEXT NOT NULL
+);
+CREATE INDEX IX_LoaiThietBi_TenLoaiThietBi ON LoaiThietBi(ten_loai_thiet_bi);
+CREATE INDEX IX_LoaiThietBi_HangSanXuat ON LoaiThietBi(hang_san_xuat);
+
+-- Table: HoaDon
+CREATE TABLE HoaDon (
+    ma_hoa_don_noi_bo VARCHAR(10) PRIMARY KEY,
+    ten_hoa_don VARCHAR(255) NOT NULL,
+    ma_so_thue_noi_ban VARCHAR(20) NOT NULL,
+    link_file_hoa_don_dien_tu TEXT NOT NULL,
+    ngay_lap_hoa_don DATE NOT NULL
+);
+CREATE INDEX IX_HoaDon_NgayLapHoaDon ON HoaDon(ngay_lap_hoa_don);
+
+-- Table: ChiTietHoaDon
+CREATE TABLE ChiTietHoaDon (
+    ma_chi_tiet_hoa_don BIGSERIAL PRIMARY KEY,
+    ma_loai_thiet_bi VARCHAR(10) NOT NULL REFERENCES LoaiThietBi(ma_loai_thiet_bi),
+    ma_hoa_don_noi_bo VARCHAR(10) NOT NULL REFERENCES HoaDon(ma_hoa_don_noi_bo) ON DELETE CASCADE,
+    don_vi_tinh VARCHAR(20) NOT NULL,
+    so_luong INT NOT NULL,
+    don_gia DECIMAL(18,2) NOT NULL
+);
+CREATE INDEX IX_ChiTietHoaDon_MaHoaDon ON ChiTietHoaDon(ma_hoa_don_noi_bo);
+CREATE INDEX IX_ChiTietHoaDon_MaLoaiThietBi ON ChiTietHoaDon(ma_loai_thiet_bi);
+
+-- Table: ThietBi
+CREATE TABLE ThietBi (
+    ma_thiet_bi VARCHAR(10) PRIMARY KEY,
+    ma_loai_thiet_bi VARCHAR(10) NOT NULL REFERENCES LoaiThietBi(ma_loai_thiet_bi),
+    ma_phong_su_dung VARCHAR(10) NOT NULL REFERENCES PhongMay(ma_phong_may),
+    ma_chi_tiet_hoa_don BIGINT REFERENCES ChiTietHoaDon(ma_chi_tiet_hoa_don),
+    trang_thai_thiet_bi VARCHAR(20) NOT NULL CHECK (trang_thai_thiet_bi IN ('dang_sua_chua', 'dang_su_dung', 'hong')),
+    ngay_mua DATE NOT NULL,
+    gia_tri DECIMAL(18,2) NOT NULL
+);
+CREATE INDEX IX_ThietBi_MaLoaiThietBi ON ThietBi(ma_loai_thiet_bi);
+CREATE INDEX IX_ThietBi_MaPhongSuDung ON ThietBi(ma_phong_su_dung);
+CREATE INDEX IX_ThietBi_TrangThaiThietBi ON ThietBi(trang_thai_thiet_bi);
+CREATE INDEX IX_ThietBi_NgayMua ON ThietBi(ngay_mua);
+
+-- Table: BaoHongThietBi
+CREATE TABLE BaoHongThietBi (
+    ma_bao_hong BIGSERIAL PRIMARY KEY,
+    ma_thiet_bi VARCHAR(10) NOT NULL REFERENCES ThietBi(ma_thiet_bi),
+    ma_tai_khoan_can_bo_bao_hong BIGINT NOT NULL REFERENCES TaiKhoan(ma_so_tai_khoan),
+    ngay_bao_hong DATE NOT NULL,
+    noi_dung_bao_hong TEXT NOT NULL,
+    ma_tai_khoan_can_bo_phan_hoi BIGINT REFERENCES TaiKhoan(ma_so_tai_khoan),
+    noi_dung_phan_hoi TEXT,
+    ngay_phan_hoi DATE,
+    trang_thai VARCHAR(20) NOT NULL CHECK (trang_thai IN ('chua_xu_ly', 'dang_xu_ly', 'da_xu_ly'))
+);
+select *from "ChiTietDangKy"
+CREATE INDEX IX_BaoHongThietBi_MaThietBi ON BaoHongThietBi(ma_thiet_bi);
+CREATE INDEX IX_BaoHongThietBi_MaTaiKhoanBaoHong ON BaoHongThietBi(ma_tai_khoan_can_bo_bao_hong);
+CREATE INDEX IX_BaoHongThietBi_MaTaiKhoanPhanHoi ON BaoHongThietBi(ma_tai_khoan_can_bo_phan_hoi);
+CREATE INDEX IX_BaoHongThietBi_NgayBaoHong ON BaoHongThietBi(ngay_bao_hong);
+CREATE INDEX IX_BaoHongThietBi_TrangThai ON BaoHongThietBi(trang_thai);
+INSERT INTO "SinhVienNhomThucHanh" ("ma_nhom_thuc_hanh", "ma_so_tai_khoan_sinh_vien","thoi_diem_dang_ky") VALUES
+  ('NTH_SOT315_231_01_1', '1614dd03-00f7-42c9-be7c-9d07809e44b4','2025-05-04');
+  ('G7', 'G8 02 Nguyển Đình Chiểu'),
+  ('G6', 'G6 02 Nguyễn Đình Chiểu');
+select *from "SinhVienNhomThucHanh"
+select *from "PhieuDangKy"
+select *from "ChiTietDangKy"
+-- Table: NamHoc
+CREATE TABLE NamHoc (
+    ma_nam_hoc VARCHAR(9) PRIMARY KEY,
+    ngay_bat_dau DATE NOT NULL,
+    ngay_ket_thuc DATE NOT NULL CHECK (ngay_ket_thuc > ngay_bat_dau)
+);
+CREATE INDEX IX_NamHoc_NgayBatDau ON NamHoc(ngay_bat_dau);
+CREATE INDEX IX_NamHoc_NgayKetThuc ON NamHoc(ngay_ket_thuc);
+
+-- Table: HocKy
+CREATE TABLE HocKy (
+    ma_hoc_ky BIGSERIAL PRIMARY KEY,
+    ten_hoc_ky VARCHAR(50) NOT NULL
+);
+
+-- Table: NamHoc_HocKy
+CREATE TABLE NamHoc_HocKy (
+    ma_nam_hoc_hoc_ky BIGSERIAL PRIMARY KEY,
+    ma_nam_hoc VARCHAR(9) NOT NULL REFERENCES NamHoc(ma_nam_hoc) ON DELETE CASCADE,
+    ma_hoc_ky BIGINT NOT NULL REFERENCES HocKy(ma_hoc_ky) ON DELETE CASCADE,
+    ngay_bat_dau DATE NOT NULL,
+    ngay_ket_thuc DATE NOT NULL,
+    UNIQUE (ma_nam_hoc, ma_hoc_ky),
+    CHECK (ngay_ket_thuc > ngay_bat_dau)
+);
+CREATE INDEX IX_NamHoc_HocKy_NgayBatDau ON NamHoc_HocKy(ngay_bat_dau);
+CREATE INDEX IX_NamHoc_HocKy_NgayKetThuc ON NamHoc_HocKy(ngay_ket_thuc);
+
+-- Table: TuanHoc
+CREATE TABLE TuanHoc (
+    ma_tuan BIGSERIAL PRIMARY KEY,
+    ma_nam_hoc_hoc_ky BIGINT NOT NULL REFERENCES NamHoc_HocKy(ma_nam_hoc_hoc_ky) ON DELETE CASCADE,
+    so_thu_tu INT NOT NULL,
+    ngay_bat_dau DATE NOT NULL,
+    ngay_ket_thuc DATE NOT NULL,
+    UNIQUE (ma_nam_hoc_hoc_ky, so_thu_tu),
+    CHECK (ngay_ket_thuc > ngay_bat_dau)
+);
+CREATE INDEX IX_TuanHoc_MaNamHocHocKy ON TuanHoc(ma_nam_hoc_hoc_ky);
+CREATE INDEX IX_TuanHoc_NgayBatDau ON TuanHoc(ngay_bat_dau);
+CREATE INDEX IX_TuanHoc_NgayKetThuc ON TuanHoc(ngay_ket_thuc);
+
+-- Table: CaHoc
+CREATE TABLE CaHoc (
+    ma_ca_hoc VARCHAR(5) PRIMARY KEY,
+    stt INT NOT NULL,
+    gio_bat_dau TIME NOT NULL,
+    gio_ket_thuc TIME NOT NULL CHECK (gio_ket_thuc > gio_bat_dau)
+);
+select *from "PhieuDangKy"
+
+-- Table: ThuTrongTuan
+CREATE TABLE ThuTrongTuan (
+    ma_thu SMALLINT PRIMARY KEY,
+    ten_thu VARCHAR(20) NOT NULL
+);
+
+-- Table: CaHoc_ThuTrongTuan
+CREATE TABLE CaHoc_ThuTrongTuan (
+    ma_ca_thu BIGSERIAL PRIMARY KEY,
+    ma_ca VARCHAR(5) NOT NULL REFERENCES CaHoc(ma_ca_hoc) ON DELETE CASCADE,
+    ma_thu SMALLINT NOT NULL REFERENCES ThuTrongTuan(ma_thu) ON DELETE CASCADE,
+    UNIQUE (ma_ca, ma_thu)
+);
+CREATE INDEX IX_CaHoc_ThuTrongTuan_MaCa ON CaHoc_ThuTrongTuan(ma_ca);
+CREATE INDEX IX_CaHoc_ThuTrongTuan_MaThu ON CaHoc_ThuTrongTuan(ma_thu);
+
+-- Table: HocPhan
+CREATE TABLE HocPhan (
+    ma_hoc_phan VARCHAR(20) PRIMARY KEY,
+    ten_hoc_phan VARCHAR(100) NOT NULL,
+    so_tin_chi INT NOT NULL CHECK (so_tin_chi > 0),
+    so_tuan_thuc_hanh INT NOT NULL CHECK (so_tuan_thuc_hanh >= 0)
+);
+CREATE INDEX IX_HocPhan_TenHocPhan ON HocPhan(ten_hoc_phan);
+
+-- Table: LopHocPhan
+CREATE TABLE LopHocPhan (
+    ma_lop_hoc_phan VARCHAR(20) PRIMARY KEY,
+    ma_tai_khoan_can_bo_giang_day BIGINT NOT NULL REFERENCES TaiKhoan(ma_so_tai_khoan),
+    ma_hoc_phan VARCHAR(20) NOT NULL REFERENCES HocPhan(ma_hoc_phan),
+    ma_nam_hoc_hoc_ky BIGINT NOT NULL REFERENCES NamHoc_HocKy(ma_nam_hoc_hoc_ky)
+);
+CREATE INDEX IX_LopHocPhan_MaHocPhan ON LopHocPhan(ma_hoc_phan);
+CREATE INDEX IX_LopHocPhan_MaNamHocHocKy ON LopHocPhan(ma_nam_hoc_hoc_ky);
+CREATE INDEX IX_LopHocPhan_MaTaiKhoanGiangDay ON LopHocPhan(ma_tai_khoan_can_bo_giang_day);
+
+-- Table: NhomThucHanh
+CREATE TABLE NhomThucHanh (
+    ma_nhom_thuc_hanh VARCHAR(20) PRIMARY KEY,
+    ma_lop_hoc_phan VARCHAR(20) NOT NULL REFERENCES LopHocPhan(ma_lop_hoc_phan) ON DELETE CASCADE,
+    phong_thuc_hanh VARCHAR(10) NOT NULL REFERENCES PhongMay(ma_phong_may),
+    ma_ca_thu BIGINT NOT NULL REFERENCES CaHoc_ThuTrongTuan(ma_ca_thu)
+);
+CREATE INDEX IX_NhomThucHanh_MaLopHocPhan ON NhomThucHanh(ma_lop_hoc_phan);
+CREATE INDEX IX_NhomThucHanh_PhongThucHanh ON NhomThucHanh(phong_thuc_hanh);
+CREATE INDEX IX_NhomThucHanh_MaCaThu ON NhomThucHanh(ma_ca_thu);
+
+-- Table: PhieuDangKy
+CREATE TABLE PhieuDangKy (
+    ma_phieu BIGSERIAL PRIMARY KEY,
+    ma_nhom_thuc_hanh VARCHAR(20) NOT NULL REFERENCES NhomThucHanh(ma_nhom_thuc_hanh) ON DELETE CASCADE,
+    ngay_dk TIMESTAMP NOT NULL
+);
+CREATE INDEX IX_PhieuDangKy_MaNhomThucHanh ON PhieuDangKy(ma_nhom_thuc_hanh);
+CREATE INDEX IX_PhieuDangKy_NgayDK ON PhieuDangKy(ngay_dk);
+
+-- Table: ChiTietDangKy
+CREATE TABLE ChiTietDangKy (
+    ma_chi_tiet_dang_ky BIGSERIAL PRIMARY KEY,
+    ma_phieu BIGINT NOT NULL REFERENCES PhieuDangKy(ma_phieu) ON DELETE CASCADE,
+    ma_tuan BIGINT NOT NULL REFERENCES TuanHoc(ma_tuan),
+    ma_ca_thu BIGINT NOT NULL REFERENCES CaHoc_ThuTrongTuan(ma_ca_thu
+    )
+);
+CREATE INDEX IX_ChiTietDangKy_MaPhieu ON ChiTietDangKy(ma_phieu);
+CREATE INDEX IX_ChiTietDangKy_MaTuan ON ChiTietDangKy(ma_tuan);
+CREATE INDEX IX_ChiTietDangKy_MaCaThu ON ChiTietDangKy(ma_ca_thu);
+
+-- Table: NhatKyThucHanh
+CREATE TABLE NhatKyThucHanh (
+    ma_nhat_ky_thuc_hanh BIGSERIAL PRIMARY KEY,
+    ma_chi_tiet_dang_ky BIGINT NOT NULL REFERENCES ChiTietDangKy(ma_chi_tiet_dang_ky) ON DELETE CASCADE,
+    noi_dung TEXT,
+    ghi_chu VARCHAR(255),
+    ngay_ghi TIMESTAMP NOT NULL
+);
+CREATE INDEX IX_NhatKyThucHanh_MaChiTietDangKy ON NhatKyThucHanh(ma_chi_tiet_dang_ky);
+CREATE INDEX IX_NhatKyThucHanh_NgayGhi ON NhatKyThucHanh(ngay_ghi);
+
+-- Table: SinhVienNhomThucHanh
+CREATE TABLE SinhVienNhomThucHanh (
+    ma_nhom_thuc_hanh VARCHAR(20) NOT NULL REFERENCES NhomThucHanh(ma_nhom_thuc_hanh) ON DELETE CASCADE,
+    ma_so_tai_khoan_sinh_vien BIGINT NOT NULL REFERENCES TaiKhoan(ma_so_tai_khoan),
+    thoi_diem_dang_ky TIMESTAMP NOT NULL,
+    PRIMARY KEY (ma_nhom_thuc_hanh, ma_so_tai_khoan_sinh_vien)
+);
+CREATE INDEX IX_SinhVienNhomThucHanh_ThoiDiemDangKy ON SinhVienNhomThucHanh(thoi_diem_dang_ky);
+ALTER TABLE "BaoHongThietBi"
+ALTER COLUMN ma_thiet_bi TYPE uuid;
+ALTER TABLE "ThietBi"
+ALTER COLUMN ma_thiet_bi TYPE uuid;

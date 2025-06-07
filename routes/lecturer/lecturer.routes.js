@@ -3,7 +3,7 @@ const router=express.Router();
 const controllerLecturer=require("../../controllers/lecturer/home.controller");
 router.get('/',controllerLecturer.index)
 router.get('/khoa-hoc/:accountId',controllerLecturer.course);
-router.get('/dang-ky-lich-thuc-hanh/:course_class_id',controllerLecturer.registerSchedule );
+router.get('/tra-cuu-lich-thuc-hanh/:course_class_id',controllerLecturer.registerSchedule );
 router.post('/dang-ky-lich-thuc-hanh',controllerLecturer.registerSchedulePost );
 module.exports=router;
   

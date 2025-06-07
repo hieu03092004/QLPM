@@ -96,9 +96,11 @@ module.exports.course = async (req, res) => {
 };
 module.exports.registerSchedule = async (req, res) => {
   try {
-    const {type,roomId}=req.query
+    const { type, roomId, session } = req.query; // type: 'even' or 'odd', session: 'morning' or 'evening'
     const { course_class_id } = req.params;
-    console.log("type:",type);
+    console.log("type:", type);
+    console.log("session:", session);
+
     // 1. Lấy thông tin lớp học phần
     const { data: lopHocPhanData, error: lopHocPhanError } = await supabase
       .from('LopHocPhan')
@@ -123,15 +125,13 @@ module.exports.registerSchedule = async (req, res) => {
 
     const maNamHocHocKy = lopHocPhanData.ma_nam_hoc_hoc_ky;
     const soTuanThucHanh = lopHocPhanData.HocPhan.so_tuan_thuc_hanh;
-    console.log('ma_nam_hoc_hoc_ky =', maNamHocHocKy);
-    console.log('so_tuan_thuc_hanh =', soTuanThucHanh);
 
     // 2. Lấy tuần thực hành và thông tin ngày bắt đầu, kết thúc
     const { data: tuanData, error: tuanError } = await supabase
-        .from('TuanHoc')
-        .select('ma_tuan, so_thu_tu, ngay_bat_dau, ngay_ket_thuc')
-        .eq('ma_nam_hoc_hoc_ky', maNamHocHocKy)
-        .order('so_thu_tu', { ascending: true });
+      .from('TuanHoc')
+      .select('ma_tuan, so_thu_tu, ngay_bat_dau, ngay_ket_thuc')
+      .eq('ma_nam_hoc_hoc_ky', maNamHocHocKy)
+      .order('so_thu_tu', { ascending: true });
 
     if (tuanError) {
       console.error('Lỗi khi truy vấn TuanHoc:', tuanError);
@@ -141,25 +141,29 @@ module.exports.registerSchedule = async (req, res) => {
         message: 'Không lấy được danh sách tuần thực hành'
       });
     }
-    let maTuanList ;
-    if(type=="chan"){
-      maTuanList = tuanData
-    .filter(tuan => tuan.so_thu_tu % 2 === 0)
-    .slice(0, soTuanThucHanh);
-    }
-    else{
-       maTuanList = tuanData
-      .filter(tuan => tuan.so_thu_tu % 2 === 1)
-      .slice(0, soTuanThucHanh);
-    }
-    console.log("maTuanList",maTuanList);
-     
 
-    //console.log('Danh sách ma_tuan =', maTuanList);
+    // Lọc tuần dựa vào type và session
+    let maTuanList;
+    if (session === 'evening') {
+      // Nếu là buổi tối, lấy tất cả các tuần
+      maTuanList = tuanData.slice(0, soTuanThucHanh);
+    } else {
+      // Nếu là buổi sáng, lọc theo tuần chẵn/lẻ
+      if (type === 'even') {
+        maTuanList = tuanData
+          .filter(tuan => tuan.so_thu_tu % 2 === 0)
+          .slice(0, soTuanThucHanh);
+      } else if (type === 'odd') {
+        maTuanList = tuanData
+          .filter(tuan => tuan.so_thu_tu % 2 === 1)
+          .slice(0, soTuanThucHanh);
+      }
+    }
+    console.log("maTuanList", maTuanList);
 
-    // 3. Lấy danh sách phòng từ bảng PhongThucHanh hoặc từ danh sách nhóm
+    // 3. Lấy danh sách phòng
     const { data: phongData, error: phongError } = await supabase
-      .from('PhongMay')  // Hoặc tên bảng tương ứng chứa danh sách phòng
+      .from('PhongMay')
       .select('ma_phong_may');
 
     if (phongError) {
@@ -172,10 +176,9 @@ module.exports.registerSchedule = async (req, res) => {
     }
 
     const phongList = phongData.map(p => p.ma_phong_may);
-    //console.log('Danh sách phòng =', phongList);
 
     // 4. Lấy tất cả các ca học - thứ trong tuần
-    const { data: allCaThu, error: allCaThuError } = await supabase
+    let caThuQuery = supabase
       .from('CaHoc_ThuTrongTuan')
       .select(`
         ma_ca_thu,
@@ -191,6 +194,13 @@ module.exports.registerSchedule = async (req, res) => {
           ten_thu
         )
       `);
+
+    // Nếu là buổi tối, chỉ lấy ca S15
+    if (session === 'evening') {
+      caThuQuery = caThuQuery.eq('ma_ca', 'S15');
+    }
+
+    const { data: allCaThu, error: allCaThuError } = await caThuQuery;
 
     if (allCaThuError) {
       console.error('Lỗi khi truy vấn ca học - thứ:', allCaThuError);
@@ -352,9 +362,6 @@ allCaThu.forEach(caThu => {
     // Danh sách ca đã đăng ký phòng này (nếu có)
     const registeredSlots = (dangKyTheoPhong[phong] || []).map(x => x.ma_ca_thu);
 
-    // Phòng này có đăng ký?
-    const isPhongDaDangKy = phongDaDangKy.includes(phong);
-
     // Lấy tất cả ma_ca_thu (slot) khả dụng cho phòng này
     const availableCaThu = [];
     // Duyệt allCaThu để build từng slot còn trống
@@ -363,9 +370,11 @@ allCaThu.forEach(caThu => {
       const caInfo = caThu.CaHoc;
       if (!thuInfo || !caInfo) return;
       let mappedThu = caThu.ma_thu;
-      if(mappedThu==1)
+      if(mappedThu==8)  // Thay đổi từ 1 thành 8
           mappedThu='CN';
-      if (isPhongDaDangKy && registeredSlots.includes(caThu.ma_ca_thu)) {
+      // Chỉ loại bỏ nếu ca_thu này đã được đăng ký
+      if (registeredSlots.includes(caThu.ma_ca_thu)) {
+        console.log(`Ca ${caThu.ma_ca_thu} đã được đăng ký cho phòng ${phong}`);
         return; // slot này đã đăng ký, bỏ qua
       }
       availableCaThu.push({
@@ -504,534 +513,3 @@ module.exports.registerSchedulePost = async (req, res) => {
     })
   }
 }
-// {
-//     "statusCode": 200,
-//     "success": true,
-//     "data": [
-//         {
-//             "phong": "G8.101",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.102",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.103",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.104",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.201",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.202",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8.203",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "NDN.201",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "NDN.202",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "NDN.203",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "NDN.204",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "NDN.205",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "KOICA",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G8P001",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G7P002",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         },
-//         {
-//             "phong": "G6P003",
-//             "Tuan": [
-//                 "Tuan_2",
-//                 "Tuan_4",
-//                 "Tuan_6",
-//                 "Tuan_8",
-//                 "Tuan_10"
-//             ],
-//             "ThoiGian": {
-//                 "Thu_2": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_2": "2023-08-22",
-//                 "ngay_ket_thuc_Thu_2": "2023-10-17",
-//                 "Thu_3": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_3": "2023-08-23",
-//                 "ngay_ket_thuc_Thu_3": "2023-10-18",
-//                 "Thu_4": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_4": "2023-08-24",
-//                 "ngay_ket_thuc_Thu_4": "2023-10-19",
-//                 "Thu_5": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_5": "2023-08-25",
-//                 "ngay_ket_thuc_Thu_5": "2023-10-20",
-//                 "Thu_6": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_6": "2023-08-26",
-//                 "ngay_ket_thuc_Thu_6": "2023-10-21",
-//                 "Thu_7": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_Thu_7": "2023-08-27",
-//                 "ngay_ket_thuc_Thu_7": "2023-10-22",
-//                 "ChuNhat": "S13(07:00->09:50)",
-//                 "ngay_bat_dau_ChuNhat": "2023-08-28",
-//                 "ngay_ket_thuc_ChuNhat": "2023-10-23"
-//             }
-//         }
-//     ]
-// }

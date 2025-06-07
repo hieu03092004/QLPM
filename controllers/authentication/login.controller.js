@@ -16,6 +16,38 @@ module.exports.login = async (req, res) => {
   }
 
   try {
+    // Lấy thông tin user từ bảng TaiKhoan
+    const { data: userInfo, error: userInfoError } = await supabase
+      .from("TaiKhoan")
+      .select(`
+        ho_va_ten,
+        ma_vai_tro,
+        VaiTro!inner(
+          ten_vai_tro
+        )
+      `)
+      .eq("email", email)
+      .single();
+
+    if (userInfoError) {
+      console.error("Lỗi khi lấy thông tin user:", userInfoError);
+      return res.status(500).json({
+        statusCode: 500,
+        success: false,
+        message: "Lỗi khi lấy thông tin user"
+      });
+    }
+
+    if (!userInfo) {
+      return res.status(404).json({
+        statusCode: 404,
+        success: false,
+        message: "Không tìm thấy thông tin user"
+      });
+    }
+
+    console.log("userInfo", userInfo);
+
     // Đăng nhập với Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
@@ -23,34 +55,53 @@ module.exports.login = async (req, res) => {
     });
 
     if (authError) {
+      console.error("Lỗi xác thực:", authError);
       return res.status(401).json({
-        success: false,
         statusCode: 401,
-        message: "Đăng nhập thất bại: " + authError.message,
+        success: false,
+        message: "Email hoặc mật khẩu không đúng",
       });
     }
 
-    // Lấy thông tin chi tiết user từ bảng TaiKhoan
-    const { data: userData, error: userError } = await supabase
+    // Lấy thông tin user từ auth
+    const { data: userData, error: userDataError } = await supabase
       .from("TaiKhoan")
-      .select("ma_so_tai_khoan, email, ho_va_ten, ma_vai_tro, trang_thai")
+      .select("*")
       .eq("email", email)
       .single();
 
-    if (userError || !userData) {
-      return res.status(404).json({
+    if (userDataError) {
+      console.error("Lỗi khi lấy thông tin user:", userDataError);
+      return res.status(500).json({
+        statusCode: 500,
         success: false,
-        statusCode: 404,
-        message: "Không tìm thấy thông tin người dùng",
+        message: "Lỗi khi lấy thông tin user",
       });
     }
 
-    // Format user data
+    // Cập nhật ho_va_ten và ma_vai_tro trong bảng TaiKhoan
+    const { error: updateError } = await supabase
+      .from("TaiKhoan")
+      .update({ 
+        ho_va_ten: userInfo.ho_va_ten,
+        ma_vai_tro: userInfo.ma_vai_tro 
+      })
+      .eq("ma_so_tai_khoan", userData.ma_so_tai_khoan);
+
+    if (updateError) {
+      console.error("Lỗi khi cập nhật thông tin:", updateError);
+      return res.status(500).json({
+        statusCode: 500,
+        success: false,
+        message: "Lỗi khi cập nhật thông tin user"
+      });
+    }
+
     const user = {
       id: userData.ma_so_tai_khoan,
       email: userData.email,
-      fullName: userData.ho_va_ten,
-      roleId: userData.ma_vai_tro,
+      fullName: userInfo.ho_va_ten,
+      roleName: userInfo.VaiTro.ten_vai_tro,
       status: userData.trang_thai,
     };
 

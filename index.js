@@ -7,6 +7,7 @@ const routeAuthentication=require("./routes/home/index.routes.js");
 const routeEquipmentManager=require("./routes/equipment_manager/index.routes.js")
 const routeLecturer=require("./routes/lecturer/index.routes.js")
 const routeAdmin=require("./routes/admin/index.routes.js")
+const routeAuthorization=require("./routes/authorization/index.route.js")
 const app = express();
 
 // CORS configuration
@@ -27,6 +28,7 @@ const port=process.env.PORT;
 route(app);
 routeAuthentication(app);
 routeEquipmentManager(app);
+routeAuthorization(app);
 routeLecturer(app);
 routeAdmin(app);
 
