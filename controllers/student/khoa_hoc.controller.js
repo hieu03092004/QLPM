@@ -161,6 +161,43 @@ module.exports.nhomThucHanh = async (req, res) => {
     })
   }
 }
+module.exports.dangKyNhomThucHanh = async (req, res) => {
+  try {
+    const { ma_tai_khoan_sinh_vien, ma_nhom_thuc_hanh } = req.body;
+    if (!ma_tai_khoan_sinh_vien || !ma_nhom_thuc_hanh) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin sinh viên hoặc nhóm thực hành.'
+      });
+    }
+
+    const { error } = await supabase
+      .from('SinhVienNhomThucHanh')
+      .insert({
+        ma_tai_khoan_sinh_vien,
+        ma_nhom_thuc_hanh
+      });
+
+    if (error) {
+      console.error('Lỗi khi đăng ký nhóm thực hành:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Đăng ký nhóm thực hành thất bại.'
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Đăng ký nhóm thực hành thành công.'
+    });
+  } catch (err) {
+    console.error('Lỗi server:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi máy chủ nội bộ.'
+    });
+  }
+};
 // module.exports.chiTietNhomThucHanh = async (req, res) => {
 //   try {
 //     const { ma_nhom_thuc_hanh } = req.params;
